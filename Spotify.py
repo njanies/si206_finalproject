@@ -14,13 +14,11 @@ username = 'njchoco'
 playlist_id = '4JHy5WbZrBrOYUJ6CzOtd5'
 track_ids = '11dFghVXANMlKmJXsNCbNl'
 
-
 scope = 'user-library-read playlist-modify-public playlist-read-private'
 redirect_uri = 'https://developer.spotify.com/dashboard/applications/bc4107086c834d10a1fa8616f1f4230a'
 client_credentials_manager = SpotifyClientCredentials(client_id=cid, client_secret=secret) 
 sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 token = util.prompt_for_user_token(username, scope, cid, secret, redirect_uri)
-
 
 sp = spotipy.Spotify(auth=token)
 results = sp.user_playlist_tracks(username, playlist_id)
@@ -35,8 +33,10 @@ list_recommendations = sp.recommendations(seed_tracks = seed_tracks, limit = 20)
 track_recommendations = []
 genres = []
 artist_names_recommendations = []
+popularity = []
 for track in list_recommendations['tracks']:
     track_recommendations.append((track['name']))
+    popularity.append((track['popularity']))
     for artist in track['artists']:
         tmp = sp.artist(artist['id'])['genres']
         if len(tmp) == 0:
@@ -45,14 +45,21 @@ for track in list_recommendations['tracks']:
             genres.append(sp.artist(artist['id'])['genres'][0])
         artist_names_recommendations.append(artist['name'])
 
-
+#write to sql file 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(BASE_DIR, "206.db")
 conn = sqlite3.connect(db_path)
 c = conn.cursor()
-data = list(zip(artist_names_recommendations, genres))
-c.executemany('INSERT INTO Spotify_Artists VALUES (?,?)', data)
-# conn.commit()
+# create the table 
+c.execute('CREATE TABLE IF NOT EXISTS Spotify_Genres (artist_names TEXT, genres TEXT)')
+data1 = list(zip(artist_names_recommendations, genres))
+data1_limit = data1[:8]
+c.executemany('INSERT INTO Spotify_Genres(artist_names, genres) VALUES (?,?)', data1_limit)
+data2 = list(zip(track_recommendations, popularity))
+data2_limit = data2[:8]
+c.execute('CREATE TABLE IF NOT EXISTS Spotify_PopScores (songs TEXT, popularity TEXT)')
+c.executemany('INSERT INTO Spotify_PopScores(songs, popularity) VALUES (?,?)', data2_limit)
+conn.commit()
 
 ###########################################################################################
 
@@ -72,7 +79,6 @@ for i in range(5):
         pass
     else:
         artist_id_musixmatch.append(temp['message']['body']['track']['artist_id'])
-
 
 new_artists_id = []
 for id in artist_id_musixmatch:
@@ -104,7 +110,17 @@ print(new_song_tuples)
 print(new_artists_names)
 print(new_artists_genres)
 
-
-
-
-
+#write to sql file 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(BASE_DIR, "206.db")
+conn = sqlite3.connect(db_path)
+c = conn.cursor()
+# create the table 
+c.execute('CREATE TABLE IF NOT EXISTS Musixmatch_Genres (artist_names TEXT, genres TEXT)')
+musixmatch_data1 = list(zip(new_artists_names, new_artists_genres))
+c.executemany('INSERT INTO Musixmatch_Genres(artist_names, genres) VALUES (?,?)', musixmatch_data1)
+musixmatch_data2 = new_song_tuples
+c.execute('CREATE TABLE IF NOT EXISTS Musixmatch_PopScores (songs TEXT, popularity TEXT)')
+c.executemany('INSERT INTO Musixmatch_PopScores(songs, popularity) VALUES (?,?)', musixmatch_data2)
+conn.commit()
+c.close()
