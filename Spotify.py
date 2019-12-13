@@ -27,39 +27,42 @@ id_list = []
 for song in results['items']:
     id_list.append(song['track']['id'])
 
-random.seed(1234)
-seed_tracks = random.sample(id_list, 5)
-list_recommendations = sp.recommendations(seed_tracks = seed_tracks, limit = 20)
-track_recommendations = []
-genres = []
-artist_names_recommendations = []
-popularity = []
-for track in list_recommendations['tracks']:
-    track_recommendations.append((track['name']))
-    popularity.append((track['popularity']))
-    for artist in track['artists']:
-        tmp = sp.artist(artist['id'])['genres']
+for x in range(4): 
+    seed_tracks = random.sample(id_list, 5)
+    list_recommendations = sp.recommendations(seed_tracks = seed_tracks, limit = 5)
+    track_recommendations = []
+    genres = []
+    artist_names_recommendations = []
+    popularity = []
+    for track in list_recommendations['tracks']:
+        track_recommendations.append((track['name']))
+        popularity.append((track['popularity']))
+        artist_info = track['artists']
+        tmp = sp.artist(artist_info[0]['id'])['genres']
         if len(tmp) == 0:
             genres.append('')
         else:
-            genres.append(sp.artist(artist['id'])['genres'][0])
-        artist_names_recommendations.append(artist['name'])
+            genres.append(tmp[0])
+        artist_names_recommendations.append(artist_info[0]['name'])
 
-#write to sql file 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-db_path = os.path.join(BASE_DIR, "206.db")
-conn = sqlite3.connect(db_path)
-c = conn.cursor()
-# create the table 
-c.execute('CREATE TABLE IF NOT EXISTS Spotify_Genres (artist_names TEXT, genres TEXT)')
-data1 = list(zip(artist_names_recommendations, genres))
-data1_limit = data1[:8]
-c.executemany('INSERT INTO Spotify_Genres(artist_names, genres) VALUES (?,?)', data1_limit)
-data2 = list(zip(track_recommendations, popularity))
-data2_limit = data2[:8]
-c.execute('CREATE TABLE IF NOT EXISTS Spotify_PopScores (songs TEXT, popularity TEXT)')
-c.executemany('INSERT INTO Spotify_PopScores(songs, popularity) VALUES (?,?)', data2_limit)
-conn.commit()
+    #write to sql file 
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(BASE_DIR, "206.db")
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    # create the table 
+    c.execute('CREATE TABLE IF NOT EXISTS Spotify_Genres (artist_names TEXT, genres TEXT)')
+    data1 = list(zip(artist_names_recommendations, genres))
+    #make it so no duplicates 
+    for i in data1:
+        if (c.execute('SELECT artist_names FROM Spotify_Genres WHERE artist_names = ?', (i[0],)).fetchone() == None):
+            c.execute('INSERT INTO Spotify_Genres(artist_names, genres) VALUES (?,?)', (i[0], i[1]))
+    data2 = list(zip(track_recommendations, popularity))
+    c.execute('CREATE TABLE IF NOT EXISTS Spotify_PopScores (songs TEXT, popularity TEXT)')
+    for i in data2:
+        if (c.execute('SELECT songs FROM Spotify_PopScores WHERE songs = ?', (i[0],)).fetchone() == None):
+            c.execute('INSERT INTO Spotify_PopScores(songs, popularity) VALUES (?,?)', (i[0], i[1]))
+    conn.commit()
 
 ###########################################################################################
 
@@ -91,21 +94,32 @@ new_artists_names = []
 new_artists_genres = []
 for id in new_artists_id:
     album_info = musixmatch.artist_albums_get(id, page = 1, page_size = 10, g_album_name = 1, s_release_date= 'asc')
-    temp_album = random.sample(album_info['message']['body']['album_list'], 1)
-    temp_songs = musixmatch.album_tracks_get(album_id=temp_album[0]['album']['album_id'], page = 1, page_size = 20, album_mbid=temp_album[0]['album']['album_mbid'] )
-    if len(temp_songs['message']['body']['track_list']) == 0:
-        pass
-    else:
-        new_song = random.sample(temp_songs['message']['body']['track_list'], 1)
-        new_song = new_song[0]
-        new_song_name = new_song['track']['track_name']
-        new_song_rating = new_song['track']['track_rating']
-        new_artists_names.append(new_song['track']['artist_name'])
-        if temp_album[0]['album']['primary_genres']['music_genre_list'] == []:
-            new_artists_genres.append("NO GENRE GIVEN")
+    try:
+        temp_album = random.sample(album_info['message']['body']['album_list'], 1)
+        if temp_album[0]['album']['album_id']:
+            temp_songs = musixmatch.album_tracks_get(album_id=temp_album[0]['album']['album_id'], page = 1, page_size = 20, album_mbid=temp_album[0]['album']['album_mbid'] )
+        if len(temp_songs['message']['body']['track_list']) == 0:
+            pass
         else:
-            new_artists_genres.append(temp_album[0]['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name'])
-        new_song_tuples.append((new_song_name, new_song_rating))
+            new_song = random.sample(temp_songs['message']['body']['track_list'], 1)
+            new_song = new_song[0]
+            new_song_name = new_song['track']['track_name']
+            new_song_rating = new_song['track']['track_rating']
+            new_artists_names.append(new_song['track']['artist_name'])
+            for album in album_info['message']['body']['album_list']:
+                if album['album']['primary_genres']['music_genre_list'] != []:
+                    new_artists_genres.append(album['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name'])
+                    break
+                else:
+                    continue
+            if new_artists_genres == []:
+                new_artists_genres.append("NO GENRE GIVEN")
+    except:
+        print('\n')
+        print('No albumn info')
+        print('\n')
+        continue
+    new_song_tuples.append((new_song_name, new_song_rating))
 print(new_song_tuples)
 print(new_artists_names)
 print(new_artists_genres)
@@ -118,9 +132,31 @@ c = conn.cursor()
 # create the table 
 c.execute('CREATE TABLE IF NOT EXISTS Musixmatch_Genres (artist_names TEXT, genres TEXT)')
 musixmatch_data1 = list(zip(new_artists_names, new_artists_genres))
-c.executemany('INSERT INTO Musixmatch_Genres(artist_names, genres) VALUES (?,?)', musixmatch_data1)
+#make it so no duplicates 
+for i in musixmatch_data1:
+    if (c.execute('SELECT artist_names FROM Musixmatch_Genres WHERE artist_names = ?', (i[0],)).fetchone() == None):
+        c.execute('INSERT INTO Musixmatch_Genres(artist_names, genres) VALUES (?,?)', (i[0], i[1]))
 musixmatch_data2 = new_song_tuples
 c.execute('CREATE TABLE IF NOT EXISTS Musixmatch_PopScores (songs TEXT, popularity TEXT)')
-c.executemany('INSERT INTO Musixmatch_PopScores(songs, popularity) VALUES (?,?)', musixmatch_data2)
+for i in musixmatch_data2:
+    if (c.execute('SELECT songs FROM Musixmatch_PopScores WHERE songs = ?', (i[0],)).fetchone() == None):
+        c.execute('INSERT INTO Musixmatch_PopScores(songs, popularity) VALUES (?,?)', (i[0], i[1]))
 conn.commit()
 c.close()
+
+
+""" temp_album = random.sample(album_info['message']['body']['album_list'], 1)
+    temp_songs = musixmatch.album_tracks_get(album_id=temp_album[0]['album']['album_id'], page = 1, page_size = 20, album_mbid=temp_album[0]['album']['album_mbid'] )
+    if len(temp_songs['message']['body']['track_list']) == 0:
+        pass
+    else:
+        new_song = random.sample(temp_songs['message']['body']['track_list'], 1)
+        new_song = new_song[0]
+        new_song_name = new_song['track']['track_name']
+        new_song_rating = new_song['track']['track_rating']
+        new_artists_names.append(new_song['track']['artist_name'])
+        if temp_album[0]['album']['primary_genres']['music_genre_list'] == []:
+            new_artists_genres.append("NO GENRE GIVEN")
+        else:
+            new_artists_genres.append(temp_album[0]['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name']) """
+        
