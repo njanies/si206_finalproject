@@ -154,6 +154,8 @@ c.close()
 
 
 
+
+
 jointables("206.db")
 jointables2("206.db")
 same_count, different_count = countsame("206.db")
@@ -161,12 +163,8 @@ barchart_musixmatch("206.db")
 barchart_spotify("206.db")
 print(same_count, different_count)
 
-
-
-
-
-
-
-
-
-        
+file1 = open("calculated_data.txt","w") 
+  
+file1.write("number of genres that are the same: " + str(same_count) + "\n") 
+file1.write("number of genres that are differfent: " + str(different_count) + "\n")
+file1.close() #to change file access modes 
