@@ -9,7 +9,10 @@ def jointables(dbname):
     db_path = os.path.join(BASE_DIR, dbname)
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('DROP TABLE JoinTable')
+    try:
+        c.execute('DROP TABLE JoinTable')
+    except:
+        pass
     c.execute("CREATE TABLE IF NOT EXISTS JoinTable (artist_names TEXT, Spotify_genres TEXT, Musixmatch_genres TEXT)")
     c.execute(
         '''
@@ -26,7 +29,10 @@ def jointables2(dbname):
     db_path = os.path.join(BASE_DIR, dbname)
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('DROP TABLE JoinTable2')
+    try:
+        c.execute('DROP TABLE JoinTable2')
+    except:
+        pass
     c.execute("CREATE TABLE IF NOT EXISTS JoinTable2 (songs TEXT, Spotify_PopScores TEXT, Musixmatch_PopScores TEXT)")
     c.execute(
         '''
