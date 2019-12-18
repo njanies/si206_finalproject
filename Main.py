@@ -7,6 +7,11 @@ import sqlite3
 import os.path
 import requests
 from musixmatch import Musixmatch
+from Utils import jointables
+from Utils import countsame
+from Utils import jointables2
+from Utils import barchart_musixmatch
+from Utils import barchart_spotify
 
 cid ='bc4107086c834d10a1fa8616f1f4230a' 
 secret = 'ca5d5a3a7ec741bf9dd9e045117b2730' 
@@ -108,7 +113,7 @@ for id in new_artists_id:
             new_artists_names.append(new_song['track']['artist_name'])
             for album in album_info['message']['body']['album_list']:
                 if album['album']['primary_genres']['music_genre_list'] != []:
-                    new_artists_genres.append(album['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name'])
+                    new_artists_genres.append(album['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name'].lower())
                     break
                 else:
                     continue
@@ -145,18 +150,23 @@ conn.commit()
 c.close()
 
 
-""" temp_album = random.sample(album_info['message']['body']['album_list'], 1)
-    temp_songs = musixmatch.album_tracks_get(album_id=temp_album[0]['album']['album_id'], page = 1, page_size = 20, album_mbid=temp_album[0]['album']['album_mbid'] )
-    if len(temp_songs['message']['body']['track_list']) == 0:
-        pass
-    else:
-        new_song = random.sample(temp_songs['message']['body']['track_list'], 1)
-        new_song = new_song[0]
-        new_song_name = new_song['track']['track_name']
-        new_song_rating = new_song['track']['track_rating']
-        new_artists_names.append(new_song['track']['artist_name'])
-        if temp_album[0]['album']['primary_genres']['music_genre_list'] == []:
-            new_artists_genres.append("NO GENRE GIVEN")
-        else:
-            new_artists_genres.append(temp_album[0]['album']['primary_genres']['music_genre_list'][0]['music_genre']['music_genre_name']) """
+
+
+
+
+jointables("206.db")
+jointables2("206.db")
+same_count, different_count = countsame("206.db")
+barchart_musixmatch("206.db")
+barchart_spotify("206.db")
+print(same_count, different_count)
+
+
+
+
+
+
+
+
+
         
